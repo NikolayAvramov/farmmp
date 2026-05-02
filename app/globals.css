@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
+/* Farm ledger — earthy palette, subtle “field furrow” texture */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* място под фиксирания bottom nav + iPhone home indicator */
+  --farm-bottom-nav: 3.5rem;
+  --farm-content-pad-bottom: calc(
+    var(--farm-bottom-nav) + env(safe-area-inset-bottom, 0px) + 0.75rem
+  );
+  --farm-bark: #2a241c;
+  --farm-forest: #142e24;
+  --farm-moss: #2a5c45;
+  --farm-sage: #5c7a5f;
+  --farm-cream: #ebe4d4;
+  --farm-parchment: #f7f3ea;
+  --farm-wheat: #b8922e;
+  --farm-wheat-dim: #9a7a26;
+  --farm-terracotta: #a85c3a;
+  --background: var(--farm-cream);
+  --foreground: var(--farm-bark);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-farm-bark: #2a241c;
+  --color-farm-forest: #142e24;
+  --color-farm-moss: #2a5c45;
+  --color-farm-sage: #5c7a5f;
+  --color-farm-cream: #ebe4d4;
+  --color-farm-parchment: #f7f3ea;
+  --color-farm-wheat: #b8922e;
+  --color-farm-wheat-dim: #9a7a26;
+  --color-farm-terracotta: #a85c3a;
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  --font-display: var(--font-literata), ui-serif, Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
+  overflow-x: hidden;
+  max-width: 100%;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--farm-cream);
+  background-image: linear-gradient(
+      165deg,
+      rgba(247, 243, 234, 0.92) 0%,
+      rgba(235, 228, 212, 0.98) 48%,
+      rgba(220, 212, 196, 0.55) 100%
+    ),
+    repeating-linear-gradient(
+      105deg,
+      transparent,
+      transparent 14px,
+      rgba(20, 46, 36, 0.04) 14px,
+      rgba(20, 46, 36, 0.04) 15px
+    );
+  min-height: 100%;
+}
+
+/* Cards: warm paper, soft lift */
+.farm-card {
+  border-radius: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--farm-bark) 12%, transparent);
+  background: color-mix(in srgb, var(--farm-parchment) 96%, white);
+  box-shadow: 0 2px 16px -4px color-mix(in srgb, var(--farm-bark) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--farm-bark) 5%, transparent) inset;
+}
+
+/* Primary CTA — deep forest */
+.farm-btn-primary {
+  border-radius: 1rem;
+  background: linear-gradient(180deg, var(--farm-moss) 0%, var(--farm-forest) 100%);
+  color: var(--farm-parchment);
+  font-weight: 600;
+  box-shadow: 0 3px 12px -2px color-mix(in srgb, var(--farm-forest) 45%, transparent);
+}
+
+.farm-btn-primary:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.farm-btn-primary:disabled {
+  opacity: 0.55;
+}
+
+/* Secondary — bark */
+.farm-btn-dark {
+  border-radius: 1rem;
+  background: var(--farm-bark);
+  color: var(--farm-parchment);
+  font-weight: 600;
+}
+
+.farm-btn-dark:disabled {
+  opacity: 0.55;
+}
+
+/* Inputs — ledger field */
+.farm-input {
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--farm-bark) 22%, transparent);
+  background: color-mix(in srgb, white 88%, var(--farm-parchment));
+  color: var(--farm-bark);
+}
+
+.farm-input:focus {
+  outline: none;
+  border-color: var(--farm-moss);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--farm-sage) 35%, transparent);
+}
+
+.farm-input::placeholder {
+  color: color-mix(in srgb, var(--farm-bark) 38%, transparent);
+}
+
+/* iOS safe area — допълнителен padding под редовете с бутони */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
+import { dbAddHarvest } from "@/lib/supabase/server-queries";
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as {
+      cropId: string;
+      productLabel: string;
+      quantity: number;
+      unit?: string;
+    };
+    const unit = body.unit === "PCS" ? "PCS" : "KG";
+    if (!body?.cropId || !body?.productLabel || typeof body.quantity !== "number") {
+      return NextResponse.json({ error: "cropId, productLabel, quantity required" }, { status: 400 });
+    }
+    const supabase = createClient(await cookies());
+    await dbAddHarvest(supabase, {
+      cropId: body.cropId,
+      productLabel: body.productLabel,
+      quantity: body.quantity,
+      unit,
+    });
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
