@@ -41,6 +41,14 @@ export async function updateOrder(
   await apiSend(`/api/orders/${encodeURIComponent(id)}`, "PATCH", patch);
 }
 
+export async function deleteCustomer(id: string): Promise<void> {
+  await apiSend(`/api/customers/${encodeURIComponent(id)}`, "DELETE");
+}
+
+export async function deleteOrder(id: string): Promise<void> {
+  await apiSend(`/api/orders/${encodeURIComponent(id)}`, "DELETE");
+}
+
 export async function listInventoryForSales(): Promise<InventoryRow[]> {
   return apiGet<InventoryRow[]>("/api/sales/inventory");
 }

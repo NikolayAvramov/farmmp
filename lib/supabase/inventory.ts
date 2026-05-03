@@ -33,3 +33,7 @@ export type InventoryPatch = {
 export async function updateInventoryItem(id: string, patch: InventoryPatch): Promise<void> {
   await apiSend(`/api/inventory/${encodeURIComponent(id)}`, "PATCH", patch);
 }
+
+export async function deleteInventoryItem(id: string): Promise<void> {
+  await apiSend(`/api/inventory/${encodeURIComponent(id)}`, "DELETE");
+}

@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { insertExpense, listExpenses, updateExpense, type ExpenseRow } from "@/lib/supabase/expenses";
+import {
+  deleteExpense,
+  insertExpense,
+  listExpenses,
+  updateExpense,
+  type ExpenseRow,
+} from "@/lib/supabase/expenses";
 
 export function ExpensesClient() {
   const [rows, setRows] = useState<ExpenseRow[]>([]);
@@ -198,6 +204,21 @@ function ExpenseRecordCard({
     }
   }
 
+  async function removeExpenseRow() {
+    if (!confirm("Да изтриеш ли този разход?")) return;
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteExpense(r.id);
+      await onRefresh();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка");
+    } finally {
+      onBusy(false);
+    }
+  }
+
   return (
     <li className="farm-card px-4 py-3">
       <div className="flex items-center justify-between gap-2">
@@ -277,6 +298,14 @@ function ExpenseRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeExpenseRow}
+          >
+            Изтрий записа
+          </button>
         </div>
       )}
     </li>

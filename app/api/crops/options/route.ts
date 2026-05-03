@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbListCropOptions } from "@/lib/supabase/server-queries";
 
 export async function GET() {
   try {
-    const supabase = createClient(await cookies());
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
     const options = await dbListCropOptions(supabase);
     return NextResponse.json(options);
   } catch (err) {

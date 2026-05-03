@@ -32,3 +32,7 @@ export type ExpensePatch = {
 export async function updateExpense(id: string, patch: ExpensePatch): Promise<void> {
   await apiSend(`/api/expenses/${encodeURIComponent(id)}`, "PATCH", patch);
 }
+
+export async function deleteExpense(id: string): Promise<void> {
+  await apiSend(`/api/expenses/${encodeURIComponent(id)}`, "DELETE");
+}

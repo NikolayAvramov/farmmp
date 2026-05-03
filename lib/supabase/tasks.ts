@@ -39,3 +39,7 @@ export type TaskPatch = {
 export async function updateTask(id: string, patch: TaskPatch): Promise<void> {
   await apiSend(`/api/tasks/${encodeURIComponent(id)}`, "PATCH", patch);
 }
+
+export async function deleteTask(id: string): Promise<void> {
+  await apiSend(`/api/tasks/${encodeURIComponent(id)}`, "DELETE");
+}

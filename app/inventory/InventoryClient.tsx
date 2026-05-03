@@ -5,6 +5,7 @@ import type { CropOption } from "@/lib/supabase/crops";
 import { listCropOptions } from "@/lib/supabase/crops";
 import {
   addHarvestToInventory,
+  deleteInventoryItem,
   listInventoryItems,
   updateInventoryItem,
   type InventoryRow,
@@ -271,6 +272,27 @@ function InventoryRecordCard({
     }
   }
 
+  async function removeItem() {
+    if (
+      !confirm(
+        "Да изтриеш ли този артикул? Няма да мине, ако участва в вече създадена поръчка (ред в sales).",
+      )
+    ) {
+      return;
+    }
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteInventoryItem(i.id);
+      await onRefresh();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка");
+    } finally {
+      onBusy(false);
+    }
+  }
+
   return (
     <li className="farm-card px-4 py-3">
       <div className="flex items-center justify-between gap-2">
@@ -362,6 +384,14 @@ function InventoryRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeItem}
+          >
+            Изтрий записа
+          </button>
         </div>
       )}
     </li>

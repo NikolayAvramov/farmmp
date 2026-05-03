@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbInsertExpense, dbListExpenses } from "@/lib/supabase/server-queries";
 
 export async function GET() {
   try {
-    const supabase = createClient(await cookies());
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
     const rows = await dbListExpenses(supabase);
     return NextResponse.json(rows);
   } catch (err) {
@@ -25,8 +26,9 @@ export async function POST(request: Request) {
     if (!body?.type?.trim() || !body?.amount?.trim() || !body?.spentAt) {
       return NextResponse.json({ error: "type, amount, spentAt required" }, { status: 400 });
     }
-    const supabase = createClient(await cookies());
-    await dbInsertExpense(supabase, body);
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    await dbInsertExpense(auth.supabase, body);
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";

@@ -21,3 +21,7 @@ export async function updateCropInSupabase(
 ): Promise<void> {
   await apiSend(`/api/crops/${encodeURIComponent(id)}`, "PATCH", payload);
 }
+
+export async function deleteCropInSupabase(id: string): Promise<void> {
+  await apiSend(`/api/crops/${encodeURIComponent(id)}`, "DELETE");
+}

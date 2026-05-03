@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbInsertCrop, dbListCrops } from "@/lib/supabase/server-queries";
 import type { CropRow } from "@/lib/crop-types";
 
 export async function GET() {
   try {
-    const supabase = createClient(await cookies());
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
     const crops = await dbListCrops(supabase);
     return NextResponse.json(crops);
   } catch (err) {
@@ -21,7 +22,9 @@ export async function POST(request: Request) {
     if (!body?.name?.trim() || !body?.variety?.trim()) {
       return NextResponse.json({ error: "name and variety required" }, { status: 400 });
     }
-    const supabase = createClient(await cookies());
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
     await dbInsertCrop(supabase, body);
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {

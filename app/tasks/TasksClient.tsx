@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CropOption } from "@/lib/supabase/crops";
 import { listCropOptions } from "@/lib/supabase/crops";
-import { insertTask, listTasks, updateTask, updateTaskStatus, type TaskRow } from "@/lib/supabase/tasks";
+import {
+  deleteTask,
+  insertTask,
+  listTasks,
+  updateTask,
+  updateTaskStatus,
+  type TaskRow,
+} from "@/lib/supabase/tasks";
 
 const types = ["WATERING", "SPRAYING", "HARVESTING"] as const;
 
@@ -251,6 +258,21 @@ function TaskRecordCard({
     }
   }
 
+  async function removeTask() {
+    if (!confirm("Да изтриеш ли тази задача?")) return;
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteTask(t.id);
+      await onRefresh();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка");
+    } finally {
+      onBusy(false);
+    }
+  }
+
   return (
     <li className="farm-card p-4">
       <div className="flex items-start justify-between gap-2">
@@ -365,6 +387,14 @@ function TaskRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeTask}
+          >
+            Изтрий записа
+          </button>
         </div>
       )}
     </li>

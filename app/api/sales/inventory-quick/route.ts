@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbInsertInventoryQuick } from "@/lib/supabase/server-queries";
 
 export async function POST(request: Request) {
@@ -13,8 +12,9 @@ export async function POST(request: Request) {
     if (!body?.productLabel?.trim() || typeof body.quantityAvailable !== "number" || !body?.unit) {
       return NextResponse.json({ error: "invalid payload" }, { status: 400 });
     }
-    const supabase = createClient(await cookies());
-    await dbInsertInventoryQuick(supabase, body);
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    await dbInsertInventoryQuick(auth.supabase, body);
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";

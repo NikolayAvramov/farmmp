@@ -92,6 +92,11 @@ export async function dbUpdateCrop(
   if (error) throw new Error(fCrops(error));
 }
 
+export async function dbDeleteCrop(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("crops").delete().eq("id", id);
+  if (error) throw new Error(fCrops(error));
+}
+
 /** --- tasks --- */
 export type TaskRow = {
   id: string;
@@ -188,6 +193,11 @@ export async function dbUpdateTask(supabase: SupabaseClient, id: string, patch: 
   if (error) throw new Error(fe("tasks", error));
 }
 
+export async function dbDeleteTask(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) throw new Error(fe("tasks", error));
+}
+
 /** --- inventory --- */
 export type InventoryRow = {
   id: string;
@@ -236,6 +246,21 @@ export async function dbListInventory(supabase: SupabaseClient): Promise<Invento
   return ((data ?? []) as InvDb[]).map(mapInv);
 }
 
+/**
+ * Нулева наличност: изтрива реда, ако никоя поръчка не сочи към този артикул.
+ * Иначе оставя 0 (FK sales_order_lines → inventory_items ON DELETE RESTRICT).
+ */
+async function dbResolveInventoryZeroQuantity(supabase: SupabaseClient, itemId: string): Promise<void> {
+  const { count, error: cErr } = await supabase
+    .from("sales_order_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("inventory_item_id", itemId);
+  if (cErr) throw new Error(fe("sales_order_lines", cErr));
+  if ((count ?? 0) > 0) return;
+  const { error } = await supabase.from("inventory_items").delete().eq("id", itemId);
+  if (error) throw new Error(fe("inventory_items", error));
+}
+
 export async function dbUpdateInventoryItem(
   supabase: SupabaseClient,
   id: string,
@@ -262,6 +287,14 @@ export async function dbUpdateInventoryItem(
   }
   const { error } = await supabase.from("inventory_items").update(row).eq("id", id);
   if (error) throw new Error(fe("inventory_items", error));
+  if (patch.quantityAvailable !== undefined && patch.quantityAvailable <= 0) {
+    await dbResolveInventoryZeroQuantity(supabase, id);
+  }
+}
+
+export async function dbDeleteInventoryItem(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+  if (error) throw new Error(fe("inventory_items", error));
 }
 
 export async function dbAddHarvest(
@@ -282,14 +315,18 @@ export async function dbAddHarvest(
 
   if (existing) {
     const cur = Number(existing.quantity_available);
+    const nextQty = cur + payload.quantity;
     const { error } = await supabase
       .from("inventory_items")
       .update({
-        quantity_available: cur + payload.quantity,
+        quantity_available: nextQty,
         product_label: payload.productLabel,
       })
       .eq("id", existing.id);
     if (error) throw new Error(fe("inventory_items", error));
+    if (nextQty <= 0) {
+      await dbResolveInventoryZeroQuantity(supabase, existing.id);
+    }
   } else {
     const { error } = await supabase.from("inventory_items").insert({
       product_label: payload.productLabel,
@@ -354,6 +391,11 @@ export async function dbUpdateExpense(
     throw new Error("Няма полета за актуализация");
   }
   const { error } = await supabase.from("expenses").update(row).eq("id", id);
+  if (error) throw new Error(fe("expenses", error));
+}
+
+export async function dbDeleteExpense(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
   if (error) throw new Error(fe("expenses", error));
 }
 
@@ -430,6 +472,11 @@ export async function dbUpdateCustomer(
   if (error) throw new Error(fe("customers", error));
 }
 
+export async function dbDeleteCustomer(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("customers").delete().eq("id", id);
+  if (error) throw new Error(fe("customers", error));
+}
+
 export async function dbListInventoryForSales(supabase: SupabaseClient): Promise<SalesInventoryRow[]> {
   const { data, error } = await supabase
     .from("inventory_items")
@@ -457,13 +504,21 @@ export async function dbInsertInventoryQuick(
   supabase: SupabaseClient,
   payload: { productLabel: string; quantityAvailable: number; unit: string },
 ): Promise<void> {
-  const { error } = await supabase.from("inventory_items").insert({
-    product_label: payload.productLabel,
-    quantity_available: payload.quantityAvailable,
-    unit: payload.unit,
-    crop_id: null,
-  });
+  const { data: row, error } = await supabase
+    .from("inventory_items")
+    .insert({
+      product_label: payload.productLabel,
+      quantity_available: payload.quantityAvailable,
+      unit: payload.unit,
+      crop_id: null,
+    })
+    .select("id")
+    .single();
+
   if (error) throw new Error(fe("inventory_items", error));
+  if (row?.id && payload.quantityAvailable <= 0) {
+    await dbResolveInventoryZeroQuantity(supabase, row.id);
+  }
 }
 
 export async function dbListOrders(supabase: SupabaseClient): Promise<OrderRow[]> {
@@ -535,6 +590,11 @@ export async function dbUpdateOrder(
     throw new Error("Няма полета за актуализация");
   }
   const { error } = await supabase.from("sales_orders").update(row).eq("id", id);
+  if (error) throw new Error(fe("sales_orders", error));
+}
+
+export async function dbDeleteOrder(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("sales_orders").delete().eq("id", id);
   if (error) throw new Error(fe("sales_orders", error));
 }
 

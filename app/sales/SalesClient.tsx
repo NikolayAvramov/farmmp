@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  deleteCustomer,
+  deleteOrder,
   insertCustomer,
-  insertInventoryQuick,
   listCustomers,
   listInventoryForSales,
   listOrders,
@@ -169,24 +170,6 @@ export function SalesClient() {
       </section>
 
       <section className="farm-card p-4">
-        <h2 className="font-display text-lg font-semibold text-farm-forest">Склад (за тест на поръчки)</h2>
-        <p className="mt-1 text-sm text-farm-bark/65">
-          Синхронизира се с таблица <code className="text-farm-moss">inventory_items</code> (екран „Наличност“).
-        </p>
-        <QuickStockForm
-          disabled={busy || loading}
-          onAdd={async (row) => {
-            await insertInventoryQuick({
-              productLabel: row.productLabel,
-              quantityAvailable: Number(row.quantityAvailable),
-              unit: row.unit,
-            });
-            await refresh();
-          }}
-        />
-      </section>
-
-      <section className="farm-card p-4">
         <h2 className="font-display text-lg font-semibold text-farm-forest">Нова поръчка</h2>
         <form onSubmit={submitOrder} className="mt-3 space-y-3">
           <label className="block text-sm font-semibold text-farm-bark/85">
@@ -327,6 +310,27 @@ function CustomerRecordCard({
     }
   }
 
+  async function removeCustomerRow() {
+    if (
+      !confirm(
+        "Да изтриеш ли клиента? Няма да стане, ако има поне една поръчка към него.",
+      )
+    ) {
+      return;
+    }
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteCustomer(c.id);
+      await onRefresh();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка");
+    } finally {
+      onBusy(false);
+    }
+  }
+
   return (
     <li className="farm-card px-4 py-3 text-sm">
       <p className="font-medium text-farm-forest">{c.name}</p>
@@ -367,6 +371,14 @@ function CustomerRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeCustomerRow}
+          >
+            Изтрий записа
+          </button>
         </div>
       )}
     </li>
@@ -417,6 +429,27 @@ function OrderRecordCard({
         customerId: form.customerId,
         orderedAt,
       });
+      await onRefresh();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка");
+    } finally {
+      onBusy(false);
+    }
+  }
+
+  async function removeOrderRow() {
+    if (
+      !confirm(
+        "Да изтриеш ли цялата поръчка? Редовете към нея също ще бъдат премахнати.",
+      )
+    ) {
+      return;
+    }
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteOrder(o.id);
       await onRefresh();
       setOpen(false);
     } catch (ex) {
@@ -503,68 +536,16 @@ function OrderRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeOrderRow}
+          >
+            Изтрий поръчката
+          </button>
         </div>
       )}
     </li>
-  );
-}
-
-function QuickStockForm({
-  disabled,
-  onAdd,
-}: {
-  disabled: boolean;
-  onAdd: (row: { productLabel: string; quantityAvailable: string; unit: "KG" | "PCS" }) => Promise<void>;
-}) {
-  const [label, setLabel] = useState("");
-  const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState<"KG" | "PCS">("KG");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const n = Number(qty);
-    if (!label.trim() || Number.isNaN(n) || n < 0) return;
-    setBusy(true);
-    try {
-      await onAdd({
-        productLabel: label.trim(),
-        quantityAvailable: String(n),
-        unit,
-      });
-      setLabel("");
-      setQty("");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-      <input
-        placeholder="Продукт"
-        className="farm-input min-h-12 flex-1 px-3 text-base"
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-      />
-      <input
-        placeholder="Кол-во"
-        inputMode="decimal"
-        className="farm-input min-h-12 w-24 px-3 text-base"
-        value={qty}
-        onChange={(e) => setQty(e.target.value)}
-      />
-      <select
-        className="farm-input min-h-12 px-3"
-        value={unit}
-        onChange={(e) => setUnit(e.target.value as "KG" | "PCS")}
-      >
-        <option value="KG">кг</option>
-        <option value="PCS">бр.</option>
-      </select>
-      <button type="submit" disabled={disabled || busy} className="farm-btn-dark min-h-12 rounded-xl px-4 text-sm">
-        Добави
-      </button>
-    </form>
   );
 }

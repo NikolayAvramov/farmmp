@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { DM_Sans, Literata } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { UserMenu } from "@/components/UserMenu";
+import { createClient } from "@/utils/supabase/server";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -26,11 +29,22 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let userEmail: string | null = null;
+  try {
+    const supabase = createClient(await cookies());
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    userEmail = user?.email ?? null;
+  } catch {
+    userEmail = null;
+  }
+
   return (
     <html
       lang="bg"
@@ -44,6 +58,9 @@ export default function RootLayout({
             className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-1 max-w-lg bg-gradient-to-r from-transparent via-farm-wheat/70 to-transparent"
             aria-hidden
           />
+          <div className="mb-3 flex justify-end">
+            <UserMenu email={userEmail} />
+          </div>
           {children}
         </div>
         <BottomNav />

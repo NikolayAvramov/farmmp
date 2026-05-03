@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbAddHarvest } from "@/lib/supabase/server-queries";
 
 export async function POST(request: Request) {
@@ -15,8 +14,9 @@ export async function POST(request: Request) {
     if (!body?.cropId || !body?.productLabel || typeof body.quantity !== "number") {
       return NextResponse.json({ error: "cropId, productLabel, quantity required" }, { status: 400 });
     }
-    const supabase = createClient(await cookies());
-    await dbAddHarvest(supabase, {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    await dbAddHarvest(auth.supabase, {
       cropId: body.cropId,
       productLabel: body.productLabel,
       quantity: body.quantity,

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { requireAuth } from "@/lib/supabase/route-auth";
 import { dbInsertCustomer, dbListCustomers } from "@/lib/supabase/server-queries";
 
 export async function GET() {
   try {
-    const supabase = createClient(await cookies());
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    const { supabase } = auth;
     const customers = await dbListCustomers(supabase);
     return NextResponse.json(customers);
   } catch (err) {
@@ -20,8 +21,9 @@ export async function POST(request: Request) {
     if (!body?.name?.trim()) {
       return NextResponse.json({ error: "name required" }, { status: 400 });
     }
-    const supabase = createClient(await cookies());
-    await dbInsertCustomer(supabase, {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+    await dbInsertCustomer(auth.supabase, {
       name: body.name.trim(),
       phone: body.phone?.trim() || null,
     });

@@ -1,20 +1,26 @@
 import { createServerClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
+export type SessionUpdate = {
+  response: NextResponse;
+  user: User | null;
+};
+
 /**
  * Refreshes the auth session and returns a response with updated cookies.
  * Do not add logic between createServerClient and getUser() (Supabase guidance).
  */
-export async function updateSession(request: NextRequest) {
+export async function updateSession(request: NextRequest): Promise<SessionUpdate> {
   let supabaseResponse = NextResponse.next({
     request,
   });
 
   if (!supabaseUrl || !supabaseKey) {
-    return supabaseResponse;
+    return { response: supabaseResponse, user: null };
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -34,7 +40,9 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
 }

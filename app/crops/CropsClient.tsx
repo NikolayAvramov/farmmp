@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { CropRow } from "@/lib/crop-types";
-import { createCropInSupabase, listCropsFromSupabase, updateCropInSupabase } from "@/lib/supabase/crops";
+import {
+  createCropInSupabase,
+  deleteCropInSupabase,
+  listCropsFromSupabase,
+  updateCropInSupabase,
+} from "@/lib/supabase/crops";
 
 const statuses = ["PLANTED", "GROWING", "HARVESTED"] as const;
 
@@ -234,6 +239,27 @@ function CropRecordCard({
     }
   }, [open, c]);
 
+  async function removeCrop() {
+    if (
+      !confirm(
+        "Да изтриеш ли тази култура? Задачи и склад ще останат, но без връзка към нея (crop празно).",
+      )
+    ) {
+      return;
+    }
+    onBusy(true);
+    onError(null);
+    try {
+      await deleteCropInSupabase(c.id);
+      await onSaved();
+      setOpen(false);
+    } catch (ex) {
+      onError(ex instanceof Error ? ex.message : "Грешка при изтриване");
+    } finally {
+      onBusy(false);
+    }
+  }
+
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     onBusy(true);
@@ -343,6 +369,14 @@ function CropRecordCard({
               Запази промените
             </button>
           </form>
+          <button
+            type="button"
+            disabled={busy || loading}
+            className="w-full rounded-2xl border-2 border-farm-terracotta/45 py-3 text-sm font-semibold text-farm-terracotta transition-colors active:bg-farm-terracotta/10"
+            onClick={removeCrop}
+          >
+            Изтрий записа
+          </button>
         </div>
       )}
     </li>

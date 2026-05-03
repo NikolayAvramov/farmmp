@@ -15,6 +15,10 @@ const links = [
 export function BottomNav() {
   const pathname = usePathname();
 
+  if (pathname === "/login" || pathname === "/register") {
+    return null;
+  }
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 max-w-[100%] border-t border-farm-bark/25 bg-farm-forest/97 shadow-[0_-6px_20px_-8px_rgba(10,22,18,0.5)] backdrop-blur-md safe-area-pb"

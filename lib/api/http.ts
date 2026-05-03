@@ -10,10 +10,17 @@ export class ApiError extends Error {
   }
 }
 
+function redirectToLoginIfUnauthorized(status: number) {
+  if (typeof window === "undefined" || status !== 401) return;
+  const next = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(path, { cache: "no-store" });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    redirectToLoginIfUnauthorized(res.status);
     const msg = typeof (body as { error?: string }).error === "string" ? (body as { error: string }).error : res.statusText;
     throw new ApiError(msg, res.status);
   }
@@ -27,11 +34,15 @@ export async function apiSend<T = void>(
 ): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers:
+      json !== undefined
+        ? { "Content-Type": "application/json" }
+        : {},
     body: json !== undefined ? JSON.stringify(json) : undefined,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
+    redirectToLoginIfUnauthorized(res.status);
     const msg = typeof (body as { error?: string }).error === "string" ? (body as { error: string }).error : res.statusText;
     throw new ApiError(msg, res.status);
   }
