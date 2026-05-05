@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CropRow } from "@/lib/crop-types";
 import { formatSupabaseTableError } from "@/lib/supabase/errors";
 
+/** DB isolation: всеки ред е на потребителя (user_id + RLS); клиентът е само със сесия от API. */
 const SCHEMA = "supabase/schema.sql";
 
 function fe(table: string, error: { message: string; code?: string }) {
@@ -41,10 +42,11 @@ function toCropRow(r: CropRowDb): CropRow {
   };
 }
 
-export async function dbListCropOptions(supabase: SupabaseClient): Promise<CropOption[]> {
+export async function dbListCropOptions(supabase: SupabaseClient, userId: string): Promise<CropOption[]> {
   const { data, error } = await supabase
     .from("crops")
     .select("id, name, variety")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fCrops(error));
   return ((data ?? []) as { id: string | number; name: string; variety: string }[]).map((r) => ({
@@ -54,17 +56,23 @@ export async function dbListCropOptions(supabase: SupabaseClient): Promise<CropO
   }));
 }
 
-export async function dbListCrops(supabase: SupabaseClient): Promise<CropRow[]> {
+export async function dbListCrops(supabase: SupabaseClient, userId: string): Promise<CropRow[]> {
   const { data, error } = await supabase
     .from("crops")
     .select("id, name, variety, planting_date, field_location, status, created_at")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fCrops(error));
   return ((data ?? []) as CropRowDb[]).map(toCropRow);
 }
 
-export async function dbInsertCrop(supabase: SupabaseClient, payload: Omit<CropRow, "id" | "createdAt">): Promise<void> {
+export async function dbInsertCrop(
+  supabase: SupabaseClient,
+  payload: Omit<CropRow, "id" | "createdAt">,
+  userId: string,
+): Promise<void> {
   const { error } = await supabase.from("crops").insert({
+    user_id: userId,
     name: payload.name,
     variety: payload.variety,
     planting_date: payload.plantingDate,
@@ -138,10 +146,11 @@ function mapTask(row: TaskDb): TaskRow {
   };
 }
 
-export async function dbListTasks(supabase: SupabaseClient): Promise<TaskRow[]> {
+export async function dbListTasks(supabase: SupabaseClient, userId: string): Promise<TaskRow[]> {
   const { data, error } = await supabase
     .from("tasks")
     .select("id, type, status, due_date, notes, crop_id, created_at, crops ( id, name, variety )")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fe("tasks", error));
   return ((data ?? []) as TaskDb[]).map(mapTask);
@@ -150,12 +159,14 @@ export async function dbListTasks(supabase: SupabaseClient): Promise<TaskRow[]> 
 export async function dbInsertTask(
   supabase: SupabaseClient,
   payload: { type: string; dueDate: string; notes: string | null; cropId: string | null },
+  userId: string,
 ): Promise<void> {
   const cropId =
     payload.cropId && payload.cropId !== ""
       ? Number.parseInt(payload.cropId, 10)
       : null;
   const { error } = await supabase.from("tasks").insert({
+    user_id: userId,
     type: payload.type,
     status: "PENDING",
     due_date: payload.dueDate,
@@ -237,10 +248,11 @@ function mapInv(r: InvDb): InventoryRow {
   };
 }
 
-export async function dbListInventory(supabase: SupabaseClient): Promise<InventoryRow[]> {
+export async function dbListInventory(supabase: SupabaseClient, userId: string): Promise<InventoryRow[]> {
   const { data, error } = await supabase
     .from("inventory_items")
     .select("id, product_label, quantity_available, unit, crop_id, created_at, crops ( name, variety )")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fe("inventory_items", error));
   return ((data ?? []) as InvDb[]).map(mapInv);
@@ -299,19 +311,28 @@ export async function dbDeleteInventoryItem(supabase: SupabaseClient, id: string
 
 export async function dbAddHarvest(
   supabase: SupabaseClient,
-  payload: { cropId: string; productLabel: string; quantity: number; unit: "KG" | "PCS" },
+  payload: {
+    cropId: string;
+    productLabel: string;
+    quantity: number;
+    unit: "KG" | "PCS";
+    userId: string;
+  },
 ): Promise<void> {
   const cropPk = Number.parseInt(payload.cropId, 10);
   if (Number.isNaN(cropPk)) throw new Error("Невалидна култура");
 
-  const { data: existing, error: findErr } = await supabase
+  /** `.maybeSingle()` гърми при повече от един ред за същата култура + мерна единица. */
+  const { data: rows, error: findErr } = await supabase
     .from("inventory_items")
     .select("id, quantity_available")
     .eq("crop_id", cropPk)
     .eq("unit", payload.unit)
-    .maybeSingle();
+    .limit(1);
 
   if (findErr) throw new Error(fe("inventory_items", findErr));
+
+  const existing = rows?.[0];
 
   if (existing) {
     const cur = Number(existing.quantity_available);
@@ -329,6 +350,7 @@ export async function dbAddHarvest(
     }
   } else {
     const { error } = await supabase.from("inventory_items").insert({
+      user_id: payload.userId,
       product_label: payload.productLabel,
       quantity_available: payload.quantity,
       unit: payload.unit,
@@ -368,10 +390,11 @@ function mapExp(r: ExpDb): ExpenseRow {
   };
 }
 
-export async function dbListExpenses(supabase: SupabaseClient): Promise<ExpenseRow[]> {
+export async function dbListExpenses(supabase: SupabaseClient, userId: string): Promise<ExpenseRow[]> {
   const { data, error } = await supabase
     .from("expenses")
     .select("id, type, amount, spent_at, notes, created_at")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fe("expenses", error));
   return ((data ?? []) as ExpDb[]).map(mapExp);
@@ -402,8 +425,10 @@ export async function dbDeleteExpense(supabase: SupabaseClient, id: string): Pro
 export async function dbInsertExpense(
   supabase: SupabaseClient,
   payload: { type: string; amount: string; spentAt: string; notes: string | null },
+  userId: string,
 ): Promise<void> {
   const { error } = await supabase.from("expenses").insert({
+    user_id: userId,
     type: payload.type,
     amount: payload.amount,
     spent_at: payload.spentAt,
@@ -432,10 +457,11 @@ export type OrderRow = {
   }[];
 };
 
-export async function dbListCustomers(supabase: SupabaseClient): Promise<CustomerRow[]> {
+export async function dbListCustomers(supabase: SupabaseClient, userId: string): Promise<CustomerRow[]> {
   const { data, error } = await supabase
     .from("customers")
     .select("id, name, phone, created_at")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fe("customers", error));
   return ((data ?? []) as { id: string; name: string; phone: string | null; created_at: string }[]).map((r) => ({
@@ -449,8 +475,10 @@ export async function dbListCustomers(supabase: SupabaseClient): Promise<Custome
 export async function dbInsertCustomer(
   supabase: SupabaseClient,
   payload: { name: string; phone: string | null },
+  userId: string,
 ): Promise<void> {
   const { error } = await supabase.from("customers").insert({
+    user_id: userId,
     name: payload.name,
     phone: payload.phone,
   });
@@ -477,10 +505,14 @@ export async function dbDeleteCustomer(supabase: SupabaseClient, id: string): Pr
   if (error) throw new Error(fe("customers", error));
 }
 
-export async function dbListInventoryForSales(supabase: SupabaseClient): Promise<SalesInventoryRow[]> {
+export async function dbListInventoryForSales(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SalesInventoryRow[]> {
   const { data, error } = await supabase
     .from("inventory_items")
     .select("id, product_label, quantity_available, unit, created_at")
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(fe("inventory_items", error));
   return (data ?? []).map(
@@ -503,10 +535,12 @@ export async function dbListInventoryForSales(supabase: SupabaseClient): Promise
 export async function dbInsertInventoryQuick(
   supabase: SupabaseClient,
   payload: { productLabel: string; quantityAvailable: number; unit: string },
+  userId: string,
 ): Promise<void> {
   const { data: row, error } = await supabase
     .from("inventory_items")
     .insert({
+      user_id: userId,
       product_label: payload.productLabel,
       quantity_available: payload.quantityAvailable,
       unit: payload.unit,
@@ -521,7 +555,7 @@ export async function dbInsertInventoryQuick(
   }
 }
 
-export async function dbListOrders(supabase: SupabaseClient): Promise<OrderRow[]> {
+export async function dbListOrders(supabase: SupabaseClient, userId: string): Promise<OrderRow[]> {
   const { data, error } = await supabase
     .from("sales_orders")
     .select(
@@ -532,6 +566,7 @@ export async function dbListOrders(supabase: SupabaseClient): Promise<OrderRow[]
       sales_order_lines ( id, quantity, product_label_snapshot, unit_snapshot )
     `,
     )
+    .eq("user_id", userId)
     .order("ordered_at", { ascending: false });
 
   if (error) throw new Error(fe("sales_orders", error));
@@ -600,7 +635,7 @@ export async function dbDeleteOrder(supabase: SupabaseClient, id: string): Promi
 
 export async function dbPlaceOrder(
   supabase: SupabaseClient,
-  payload: { customerId: string; inventoryItemId: string; quantity: number },
+  payload: { customerId: string; inventoryItemId: string; quantity: number; userId: string },
 ): Promise<void> {
   const { data: inv, error: invErr } = await supabase
     .from("inventory_items")
@@ -626,7 +661,7 @@ export async function dbPlaceOrder(
 
   const { data: order, error: orderErr } = await supabase
     .from("sales_orders")
-    .insert({ customer_id: payload.customerId })
+    .insert({ customer_id: payload.customerId, user_id: payload.userId })
     .select("id")
     .single();
 

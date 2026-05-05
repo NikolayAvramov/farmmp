@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       productLabel: body.productLabel,
       quantity: body.quantity,
       unit,
+      userId: auth.user.id,
     });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {

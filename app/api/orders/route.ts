@@ -6,8 +6,8 @@ export async function GET() {
   try {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    const { supabase } = auth;
-    const orders = await dbListOrders(supabase);
+    const { supabase, user } = auth;
+    const orders = await dbListOrders(supabase, user.id);
     return NextResponse.json(orders);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    await dbPlaceOrder(auth.supabase, body);
+    await dbPlaceOrder(auth.supabase, { ...body, userId: auth.user.id });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";

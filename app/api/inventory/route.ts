@@ -6,8 +6,8 @@ export async function GET() {
   try {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    const { supabase } = auth;
-    const items = await dbListInventory(supabase);
+    const { supabase, user } = auth;
+    const items = await dbListInventory(supabase, user.id);
     return NextResponse.json(items);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";

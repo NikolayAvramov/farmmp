@@ -26,6 +26,28 @@ alter table public.sales_orders alter column user_id set default auth.uid();
 alter table public.expenses alter column user_id set default auth.uid();
 alter table public.todos alter column user_id set default auth.uid();
 
+-- Стари редове без собственик: попълване или изчистване (иначе NOT NULL гърми).
+do $$
+declare
+  owner_id uuid;
+begin
+  select id into owner_id from auth.users order by created_at asc limit 1;
+
+  if owner_id is not null then
+    update public.crops set user_id = owner_id where user_id is null;
+    update public.tasks set user_id = owner_id where user_id is null;
+    update public.inventory_items set user_id = owner_id where user_id is null;
+    update public.customers set user_id = owner_id where user_id is null;
+    update public.sales_orders set user_id = owner_id where user_id is null;
+    update public.expenses set user_id = owner_id where user_id is null;
+    update public.todos set user_id = owner_id where user_id is null;
+  else
+    truncate table public.sales_order_lines, public.sales_orders, public.customers,
+      public.inventory_items, public.tasks, public.expenses, public.todos, public.crops
+      restart identity cascade;
+  end if;
+end $$;
+
 -- След като всеки ред има user_id:
 alter table public.crops alter column user_id set not null;
 alter table public.tasks alter column user_id set not null;
@@ -151,7 +173,14 @@ create policy "customers_own" on public.customers for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "sales_orders_own" on public.sales_orders for all to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+  using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.customers c
+      where c.id = customer_id and c.user_id = auth.uid()
+    )
+  );
 
 create policy "sales_order_lines_own" on public.sales_order_lines for all to authenticated
   using (
@@ -159,11 +188,19 @@ create policy "sales_order_lines_own" on public.sales_order_lines for all to aut
       select 1 from public.sales_orders o
       where o.id = sales_order_lines.order_id and o.user_id = auth.uid()
     )
+    and exists (
+      select 1 from public.inventory_items i
+      where i.id = sales_order_lines.inventory_item_id and i.user_id = auth.uid()
+    )
   )
   with check (
     exists (
       select 1 from public.sales_orders o
       where o.id = sales_order_lines.order_id and o.user_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.inventory_items i
+      where i.id = inventory_item_id and i.user_id = auth.uid()
     )
   );
 

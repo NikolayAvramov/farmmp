@@ -12,13 +12,36 @@ import {
   type TaskRow,
 } from "@/lib/supabase/tasks";
 
-const types = ["WATERING", "SPRAYING", "HARVESTING"] as const;
+const PRESET_TYPES = ["WATERING", "SPRAYING", "HARVESTING"] as const;
+type PresetType = (typeof PRESET_TYPES)[number];
+/** Стойност в `<select>` за произволно име на задача (реалният `type` в DB е текстът от полето). */
+const OTHER_PRESET = "__OTHER__" as const;
+type TypeSelectValue = PresetType | typeof OTHER_PRESET;
 
-const typeBg: Record<(typeof types)[number], string> = {
+const typeBg: Record<PresetType, string> = {
   WATERING: "Поливане",
   SPRAYING: "Пръскане",
   HARVESTING: "Беритба",
 };
+
+function isPresetType(s: string): s is PresetType {
+  return (PRESET_TYPES as readonly string[]).includes(s);
+}
+
+function fromStoredTaskType(stored: string): { preset: TypeSelectValue; customType: string } {
+  if (isPresetType(stored)) return { preset: stored, customType: "" };
+  return { preset: OTHER_PRESET, customType: stored };
+}
+
+function toStoredTaskType(preset: TypeSelectValue, customType: string): string {
+  if (preset === OTHER_PRESET) return customType.trim();
+  return preset;
+}
+
+function displayTypeLabel(type: string): string {
+  if (isPresetType(type)) return typeBg[type];
+  return type.trim() || "Друго";
+}
 
 export function TasksClient() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
@@ -27,7 +50,8 @@ export function TasksClient() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [form, setForm] = useState({
-    type: "WATERING" as (typeof types)[number],
+    typePreset: "WATERING" as TypeSelectValue,
+    customType: "",
     cropId: "",
     dueDate: new Date().toISOString().slice(0, 10),
     notes: "",
@@ -60,14 +84,19 @@ export function TasksClient() {
     setBusy(true);
     setErr(null);
     try {
+      const typeStored = toStoredTaskType(form.typePreset, form.customType);
+      if (form.typePreset === OTHER_PRESET && !typeStored) {
+        setErr("Напишете име на задачата при „Друго“.");
+        return;
+      }
       await insertTask({
-        type: form.type,
+        type: typeStored,
         dueDate: form.dueDate,
         notes: form.notes.trim() || null,
         cropId: form.cropId || null,
       });
       await refresh();
-      setForm((f) => ({ ...f, notes: "" }));
+      setForm((f) => ({ ...f, notes: "", customType: "" }));
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : "Грешка");
     } finally {
@@ -87,10 +116,6 @@ export function TasksClient() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function typeLabel(t: string) {
-    return typeBg[t as (typeof types)[number]] ?? t;
   }
 
   return (
@@ -113,18 +138,36 @@ export function TasksClient() {
           Вид работа
           <select
             className="farm-input mt-1.5 w-full min-h-12 px-3 text-base"
-            value={form.type}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, type: e.target.value as (typeof types)[number] }))
-            }
+            value={form.typePreset}
+            onChange={(e) => {
+              const v = e.target.value as TypeSelectValue;
+              setForm((f) => ({
+                ...f,
+                typePreset: v,
+                customType: v === OTHER_PRESET ? f.customType : "",
+              }));
+            }}
           >
-            {types.map((t) => (
+            {PRESET_TYPES.map((t) => (
               <option key={t} value={t}>
                 {typeBg[t]}
               </option>
             ))}
+            <option value={OTHER_PRESET}>Друго…</option>
           </select>
         </label>
+        {form.typePreset === OTHER_PRESET && (
+          <label className="block text-sm font-semibold text-farm-bark/85">
+            Име на задачата
+            <input
+              className="farm-input mt-1.5 w-full min-h-12 px-3 text-base"
+              placeholder="Напр. Преглед на оранжерията"
+              value={form.customType}
+              onChange={(e) => setForm((f) => ({ ...f, customType: e.target.value }))}
+              required
+            />
+          </label>
+        )}
         <label className="block text-sm font-semibold text-farm-bark/85">
           Култура (по избор)
           <select
@@ -175,7 +218,7 @@ export function TasksClient() {
             crops={crops}
             busy={busy}
             loading={loading}
-            typeLabel={typeLabel}
+            typeLabel={displayTypeLabel}
             onRefresh={refresh}
             onError={setErr}
             onBusy={setBusy}
@@ -190,6 +233,32 @@ export function TasksClient() {
 function formatTs(iso: string) {
   try {
     return new Date(iso).toLocaleString("bg-BG", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
+/** dueDate идва като YYYY-MM-DD от API */
+function formatDueDate(ymd: string) {
+  try {
+    return new Date(`${ymd}T12:00:00`).toLocaleDateString("bg-BG", {
+      weekday: "short",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return ymd;
+  }
+}
+
+function formatCreatedShort(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString("bg-BG", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   } catch {
     return iso;
   }
@@ -217,18 +286,24 @@ function TaskRecordCard({
   onToggleDone: (t: TaskRow) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    type: t.type as (typeof types)[number],
-    cropId: t.cropId ?? "",
-    dueDate: t.dueDate,
-    notes: t.notes ?? "",
-    status: t.status,
+  const [form, setForm] = useState(() => {
+    const { preset, customType } = fromStoredTaskType(t.type);
+    return {
+      typePreset: preset,
+      customType,
+      cropId: t.cropId ?? "",
+      dueDate: t.dueDate,
+      notes: t.notes ?? "",
+      status: t.status,
+    };
   });
 
   useEffect(() => {
     if (open) {
+      const { preset, customType } = fromStoredTaskType(t.type);
       setForm({
-        type: (types.includes(t.type as (typeof types)[number]) ? t.type : "WATERING") as (typeof types)[number],
+        typePreset: preset,
+        customType,
         cropId: t.cropId ?? "",
         dueDate: t.dueDate,
         notes: t.notes ?? "",
@@ -242,8 +317,13 @@ function TaskRecordCard({
     onBusy(true);
     onError(null);
     try {
+      const typeStored = toStoredTaskType(form.typePreset, form.customType);
+      if (form.typePreset === OTHER_PRESET && !typeStored) {
+        onError("Напишете име на задачата при „Друго“.");
+        return;
+      }
       await updateTask(t.id, {
-        type: form.type,
+        type: typeStored,
         dueDate: form.dueDate,
         notes: form.notes.trim() || null,
         cropId: form.cropId || null,
@@ -273,19 +353,52 @@ function TaskRecordCard({
     }
   }
 
+  const notesTrim = t.notes?.trim() ?? "";
+
   return (
     <li className="farm-card p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium text-farm-forest">
-            {typeLabel(t.type)}
-            {t.crop && (
-              <span className="font-normal text-farm-bark/65"> · {t.crop.name}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <p className="font-semibold leading-snug text-farm-forest">{typeLabel(t.type)}</p>
+            {t.crop ? (
+              <p className="mt-0.5 text-sm text-farm-bark/75">
+                Култура:{" "}
+                <span className="font-medium text-farm-bark/90">
+                  {t.crop.name}
+                  <span className="font-normal text-farm-bark/60"> · {t.crop.variety}</span>
+                </span>
+              </p>
+            ) : (
+              <p className="mt-0.5 text-sm italic text-farm-bark/50">Без избрана култура</p>
             )}
-          </p>
-          <p className="text-sm text-farm-bark/65">
-            До {t.dueDate} · {t.status === "DONE" ? "Изпълнено" : "Чака"}
-          </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+            <span className="text-farm-bark/70">
+              Краен срок:{" "}
+              <time dateTime={t.dueDate} className="font-semibold text-farm-bark/90">
+                {formatDueDate(t.dueDate)}
+              </time>
+            </span>
+            <span
+              className={`inline-flex rounded-lg px-2 py-0.5 font-semibold ${
+                t.status === "DONE"
+                  ? "bg-farm-moss/20 text-farm-forest"
+                  : "bg-farm-wheat/50 text-farm-bark"
+              }`}
+            >
+              {t.status === "DONE" ? "Изпълнено" : "Чака"}
+            </span>
+            <span className="text-farm-bark/55">Създадена {formatCreatedShort(t.createdAt)}</span>
+          </div>
+          {notesTrim ? (
+            <div className="rounded-lg border border-farm-bark/10 bg-farm-parchment/40 px-3 py-2">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-farm-sage">Бележки</p>
+              <p className="mt-1 line-clamp-4 text-sm leading-relaxed whitespace-pre-wrap text-farm-bark/85">
+                {notesTrim}
+              </p>
+            </div>
+          ) : null}
         </div>
         <button
           type="button"
@@ -326,18 +439,35 @@ function TaskRecordCard({
               Вид работа
               <select
                 className="farm-input mt-1.5 w-full min-h-12 px-3 text-base"
-                value={form.type}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, type: e.target.value as (typeof types)[number] }))
-                }
+                value={form.typePreset}
+                onChange={(e) => {
+                  const v = e.target.value as TypeSelectValue;
+                  setForm((f) => ({
+                    ...f,
+                    typePreset: v,
+                    customType: v === OTHER_PRESET ? f.customType : "",
+                  }));
+                }}
               >
-                {types.map((x) => (
+                {PRESET_TYPES.map((x) => (
                   <option key={x} value={x}>
                     {typeBg[x]}
                   </option>
                 ))}
+                <option value={OTHER_PRESET}>Друго…</option>
               </select>
             </label>
+            {form.typePreset === OTHER_PRESET && (
+              <label className="block text-sm font-semibold text-farm-bark/85">
+                Име на задачата
+                <input
+                  className="farm-input mt-1.5 w-full min-h-12 px-3 text-base"
+                  value={form.customType}
+                  onChange={(e) => setForm((f) => ({ ...f, customType: e.target.value }))}
+                  required
+                />
+              </label>
+            )}
             <label className="block text-sm font-semibold text-farm-bark/85">
               Култура
               <select

@@ -7,8 +7,8 @@ export async function GET() {
   try {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    const { supabase } = auth;
-    const crops = await dbListCrops(supabase);
+    const { supabase, user } = auth;
+    const crops = await dbListCrops(supabase, user.id);
     return NextResponse.json(crops);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
     }
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    const { supabase } = auth;
-    await dbInsertCrop(supabase, body);
+    const { supabase, user } = auth;
+    await dbInsertCrop(supabase, body, user.id);
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";

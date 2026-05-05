@@ -6,8 +6,8 @@ export async function GET() {
   try {
     const auth = await requireAuth();
     if (auth instanceof NextResponse) return auth;
-    const { supabase } = auth;
-    const options = await dbListCropOptions(supabase);
+    const { supabase, user } = auth;
+    const options = await dbListCropOptions(supabase, user.id);
     return NextResponse.json(options);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";
