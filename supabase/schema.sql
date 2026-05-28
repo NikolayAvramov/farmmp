@@ -106,6 +106,35 @@ create table if not exists public.todos (
 alter table public.todos add column if not exists user_id uuid references auth.users (id) on delete cascade;
 alter table public.todos alter column user_id set default auth.uid();
 
+-- ========== crop guides (професионален календар по шаблони) ==========
+create table if not exists public.crop_guides (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  crop_name text not null,
+  category text not null check (category in ('VEGETABLE', 'FRUIT')),
+  image_url text,
+  summary text not null,
+  steps jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.crop_guides add column if not exists user_id uuid references auth.users (id) on delete cascade;
+alter table public.crop_guides alter column user_id set default auth.uid();
+
+-- ========== push subscriptions (PWA push) ==========
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.push_subscriptions add column if not exists user_id uuid references auth.users (id) on delete cascade;
+alter table public.push_subscriptions alter column user_id set default auth.uid();
+
 -- ========== тригери: crop_id в рамките на същия потребител ==========
 create or replace function public.enforce_same_user_crop_task()
 returns trigger
@@ -162,6 +191,8 @@ create index if not exists customers_user_id_idx on public.customers (user_id);
 create index if not exists sales_orders_user_id_idx on public.sales_orders (user_id);
 create index if not exists expenses_user_id_idx on public.expenses (user_id);
 create index if not exists todos_user_id_idx on public.todos (user_id);
+create index if not exists crop_guides_user_id_idx on public.crop_guides (user_id);
+create index if not exists push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
 
 -- ========== права ==========
 grant usage on schema public to authenticated;
@@ -174,6 +205,8 @@ revoke all on table public.sales_orders from anon;
 revoke all on table public.sales_order_lines from anon;
 revoke all on table public.expenses from anon;
 revoke all on table public.todos from anon;
+revoke all on table public.crop_guides from anon;
+revoke all on table public.push_subscriptions from anon;
 
 grant select, insert, update, delete on table public.crops to authenticated;
 grant select, insert, update, delete on table public.tasks to authenticated;
@@ -183,6 +216,8 @@ grant select, insert, update, delete on table public.sales_orders to authenticat
 grant select, insert, update, delete on table public.sales_order_lines to authenticated;
 grant select, insert, update, delete on table public.expenses to authenticated;
 grant select, insert, update, delete on table public.todos to authenticated;
+grant select, insert, update, delete on table public.crop_guides to authenticated;
+grant select, insert, update, delete on table public.push_subscriptions to authenticated;
 
 grant usage, select on all sequences in schema public to authenticated;
 
@@ -194,6 +229,8 @@ grant all on table public.sales_orders to service_role;
 grant all on table public.sales_order_lines to service_role;
 grant all on table public.expenses to service_role;
 grant all on table public.todos to service_role;
+grant all on table public.crop_guides to service_role;
+grant all on table public.push_subscriptions to service_role;
 
 -- ========== RLS ==========
 drop policy if exists "crops_select_anon" on public.crops;
@@ -210,13 +247,15 @@ alter table public.sales_orders enable row level security;
 alter table public.sales_order_lines enable row level security;
 alter table public.expenses enable row level security;
 alter table public.todos enable row level security;
+alter table public.crop_guides enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 do $$
 declare
   t text;
   tables text[] := array[
     'crops', 'tasks', 'inventory_items', 'customers',
-    'sales_orders', 'sales_order_lines', 'expenses', 'todos'
+    'sales_orders', 'sales_order_lines', 'expenses', 'todos', 'crop_guides', 'push_subscriptions'
   ];
 begin
   foreach t in array tables
@@ -276,4 +315,10 @@ create policy "expenses_own" on public.expenses for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "todos_own" on public.todos for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "crop_guides_own" on public.crop_guides for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "push_subscriptions_own" on public.push_subscriptions for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());

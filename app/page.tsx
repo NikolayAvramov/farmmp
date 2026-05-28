@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { HomeOnboardingSlot } from "@/components/HomeOnboardingSlot";
 import { StatCard } from "@/components/StatCard";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -52,6 +53,7 @@ export default async function Home() {
 
   return (
     <>
+      <HomeOnboardingSlot />
       <header className="mb-5 flex items-start justify-between gap-3 border-b border-farm-bark/10 pb-4">
         <div className="min-w-0">
           <p className="font-sans text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-farm-moss">
@@ -82,6 +84,12 @@ export default async function Home() {
       </div>
 
       <div className="mt-8 flex flex-col gap-3">
+        <Link
+          href="/calendar"
+          className="flex min-h-14 items-center justify-center rounded-2xl border-2 border-farm-forest/75 bg-farm-forest text-lg font-semibold text-farm-cream shadow-sm transition-colors active:bg-farm-forest/90"
+        >
+          Агро календар
+        </Link>
         <Link
           href="/crops"
           className="farm-btn-primary flex min-h-14 items-center justify-center rounded-2xl text-lg"

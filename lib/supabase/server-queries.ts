@@ -15,6 +15,21 @@ function fCrops(error: { message: string; code?: string }) {
 
 /** --- crops --- */
 export type CropOption = { id: string; name: string; variety: string };
+export type CropGuideStep = {
+  title: string;
+  description: string;
+  offsetDays: number;
+  taskType: string;
+};
+export type CropGuideRow = {
+  id: string;
+  cropName: string;
+  category: "VEGETABLE" | "FRUIT";
+  imageUrl: string | null;
+  summary: string;
+  steps: CropGuideStep[];
+  createdAt: string;
+};
 
 type CropRowDb = {
   id: string | number;
@@ -70,16 +85,21 @@ export async function dbInsertCrop(
   supabase: SupabaseClient,
   payload: Omit<CropRow, "id" | "createdAt">,
   userId: string,
-): Promise<void> {
-  const { error } = await supabase.from("crops").insert({
-    user_id: userId,
-    name: payload.name,
-    variety: payload.variety,
-    planting_date: payload.plantingDate,
-    field_location: payload.fieldLocation,
-    status: payload.status,
-  });
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("crops")
+    .insert({
+      user_id: userId,
+      name: payload.name,
+      variety: payload.variety,
+      planting_date: payload.plantingDate,
+      field_location: payload.fieldLocation,
+      status: payload.status,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(fCrops(error));
+  return String(data.id);
 }
 
 export async function dbUpdateCrop(
@@ -103,6 +123,88 @@ export async function dbUpdateCrop(
 export async function dbDeleteCrop(supabase: SupabaseClient, id: string): Promise<void> {
   const { error } = await supabase.from("crops").delete().eq("id", id);
   if (error) throw new Error(fCrops(error));
+}
+
+/** --- crop guides --- */
+type CropGuideDb = {
+  id: string;
+  crop_name: string;
+  category: "VEGETABLE" | "FRUIT";
+  image_url: string | null;
+  summary: string;
+  steps: CropGuideStep[] | null;
+  created_at: string;
+};
+
+function mapCropGuide(row: CropGuideDb): CropGuideRow {
+  return {
+    id: row.id,
+    cropName: row.crop_name,
+    category: row.category,
+    imageUrl: row.image_url,
+    summary: row.summary,
+    steps: Array.isArray(row.steps) ? row.steps : [],
+    createdAt: row.created_at,
+  };
+}
+
+export async function dbListCropGuides(supabase: SupabaseClient, userId: string): Promise<CropGuideRow[]> {
+  const { data, error } = await supabase
+    .from("crop_guides")
+    .select("id, crop_name, category, image_url, summary, steps, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(fe("crop_guides", error));
+  return ((data ?? []) as CropGuideDb[]).map(mapCropGuide);
+}
+
+export async function dbInsertCropGuide(
+  supabase: SupabaseClient,
+  userId: string,
+  payload: {
+    cropName: string;
+    category: "VEGETABLE" | "FRUIT";
+    imageUrl: string | null;
+    summary: string;
+    steps: CropGuideStep[];
+  },
+): Promise<void> {
+  const { error } = await supabase.from("crop_guides").insert({
+    user_id: userId,
+    crop_name: payload.cropName,
+    category: payload.category,
+    image_url: payload.imageUrl,
+    summary: payload.summary,
+    steps: payload.steps,
+  });
+  if (error) throw new Error(fe("crop_guides", error));
+}
+
+export async function dbUpdateCropGuide(
+  supabase: SupabaseClient,
+  id: string,
+  patch: {
+    cropName?: string;
+    category?: "VEGETABLE" | "FRUIT";
+    imageUrl?: string | null;
+    summary?: string;
+    steps?: CropGuideStep[];
+  },
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.cropName !== undefined) row.crop_name = patch.cropName;
+  if (patch.category !== undefined) row.category = patch.category;
+  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  if (patch.summary !== undefined) row.summary = patch.summary;
+  if (patch.steps !== undefined) row.steps = patch.steps;
+  if (Object.keys(row).length === 0) throw new Error("Няма полета за актуализация");
+  const { error } = await supabase.from("crop_guides").update(row).eq("id", id);
+  if (error) throw new Error(fe("crop_guides", error));
+}
+
+export async function dbDeleteCropGuide(supabase: SupabaseClient, id: string): Promise<void> {
+  const { error } = await supabase.from("crop_guides").delete().eq("id", id);
+  if (error) throw new Error(fe("crop_guides", error));
 }
 
 /** --- tasks --- */

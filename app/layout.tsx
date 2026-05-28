@@ -3,6 +3,7 @@ import { DM_Sans, Literata } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { PushNotifications } from "@/components/PushNotifications";
 import { UserMenu } from "@/components/UserMenu";
 import { createClient } from "@/utils/supabase/server";
 
@@ -21,6 +22,7 @@ const literata = Literata({
 export const metadata: Metadata = {
   title: "Farm log",
   description: "Simple crop, harvest, inventory, and sales tracking",
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport = {
@@ -61,6 +63,7 @@ export default async function RootLayout({
           <div className="mb-3 flex justify-end">
             <UserMenu email={userEmail} />
           </div>
+          <PushNotifications />
           {children}
         </div>
         <BottomNav />
