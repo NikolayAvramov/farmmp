@@ -85,6 +85,12 @@ export default async function Home() {
 
       <div className="mt-8 flex flex-col gap-3">
         <Link
+          href="/diagnose"
+          className="flex min-h-14 items-center justify-center rounded-2xl border-2 border-farm-terracotta/50 bg-farm-terracotta/15 text-lg font-semibold text-farm-bark shadow-sm transition-colors active:bg-farm-terracotta/25"
+        >
+          AI диагностика по снимка
+        </Link>
+        <Link
           href="/calendar"
           className="flex min-h-14 items-center justify-center rounded-2xl border-2 border-farm-forest/75 bg-farm-forest text-lg font-semibold text-farm-cream shadow-sm transition-colors active:bg-farm-forest/90"
         >

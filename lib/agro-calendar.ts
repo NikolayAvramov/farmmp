@@ -60,79 +60,6 @@ const DEFAULT_STEPS: CropPlanStep[] = [
 
 const IMG = "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80";
 
-const DEFAULT_ROWS: CropStageRow[] = [
-  {
-    stage: "Подготовка на площта",
-    period: "7-14 дни преди засаждане",
-    goal: "Старт с чиста площ и добра структура на почвата.",
-    nutrition: "Органика + базов NPK с повече фосфор.",
-    frequency: "Еднократно преди старта.",
-    plantingScheme: "Според културата.",
-    taskType: "SEEDING",
-    offsetDays: -10,
-  },
-  {
-    stage: "Засаждане / сеитба",
-    period: "Начало на периода за културата",
-    goal: "Равномерно поникване и вкореняване.",
-    nutrition: "Стартер с умерен азот.",
-    frequency: "В деня на засаждане.",
-    plantingScheme: "По редове и междуредия.",
-    taskType: "SEEDING",
-    offsetDays: 0,
-  },
-  {
-    stage: "Начален растеж",
-    period: "10-20 дни след засаждане",
-    goal: "Силен листен апарат.",
-    nutrition: "Баланс NPK + микроелементи при нужда.",
-    frequency: "На 7-10 дни.",
-    plantingScheme: "Контрол на гъстотата.",
-    taskType: "FEEDING",
-    offsetDays: 14,
-  },
-  {
-    stage: "Окопаване и поддръжка",
-    period: "2-4 седмици след засаждане",
-    goal: "Плевелоконтрол и аерация.",
-    nutrition: "Леко азотно подхранване при нужда.",
-    frequency: "1-2 обработки.",
-    plantingScheme: "Около реда и в междуредията.",
-    taskType: "HOEING",
-    offsetDays: 21,
-  },
-  {
-    stage: "Растителна защита",
-    period: "От вегетация до беритба",
-    goal: "Предпазване от болести и неприятели.",
-    nutrition: "Листни торове при стрес.",
-    frequency: "На 10-14 дни според условията.",
-    plantingScheme: "Пълно покритие на растенията.",
-    taskType: "SPRAYING",
-    offsetDays: 30,
-  },
-  {
-    stage: "Косене около насаждението",
-    period: "След прихващане до края на сезона",
-    goal: "Чисти междуредия и по-малко плевели.",
-    nutrition: "Не се прилага.",
-    frequency: "На 2-3 седмици.",
-    plantingScheme: "Около редовете/овошките.",
-    taskType: "MOWING",
-    offsetDays: 35,
-  },
-  {
-    stage: "Беритба",
-    period: "Според зрелостта",
-    goal: "Качествена и навременна реколта.",
-    nutrition: "Калиево подхранване при нужда.",
-    frequency: "Периодично/поетапно.",
-    plantingScheme: "Селективно обиране.",
-    taskType: "HARVESTING",
-    offsetDays: 75,
-  },
-];
-
 type CropSeed = {
   name: string;
   category: "VEGETABLE" | "FRUIT";
@@ -142,6 +69,11 @@ type CropSeed = {
   harvest: string;
   scheme: string;
   summary: string;
+  cycleDays?: number;
+  sprayDays?: number;
+  feedingPlan?: string;
+  risk?: string;
+  mowingZone?: string;
 };
 
 const CROP_SEEDS: CropSeed[] = [
@@ -180,11 +112,93 @@ const EXTRA_CROPS = [
   "Ряпа","Пащърнак","Целина","Кейл","Къдраво зеле","Праз","Копър","Рукола","Босилек","Мента","Маточина","Кориандър","Синап","Сладка царевица","Нахут","Леща","Соя","Фъстък","Диня","Пъпеш","Артишок","Аспержи","Бамя","Хрян","Батат","Черен корен","Ендивия","Цикория","Лапад","Киселец","Киноа","Амарант","Слънчоглед","Рапица","Люцерна","Ечемик","Пшеница","Ръж","Овес","Тритикале","Сорго","Просо","Лен","Тютюн","Лавандула","Розмарин","Салвия","Мащерка","Риган","Естрагон","Невен","Камомила","Хмел","Арония","Боровинки","Касис","Червено френско грозде","Цариградско грозде","Дюля","Нар","Смокини","Лешници","Орехи","Бадеми","Кестени","Черници","Киви","Актинидия","Лозя десертни","Лозя винени","Шипка","Бъз","Японска дюля","Облепиха","Годжи бери","Вишни","Нектарини"
 ] as const;
 
-function buildRows(scheme: string): CropStageRow[] {
-  return DEFAULT_ROWS.map((r) => ({ ...r, plantingScheme: scheme }));
+function buildRows(seed: CropSeed): CropStageRow[] {
+  const cycleDays = seed.cycleDays ?? (seed.category === "FRUIT" ? 180 : 95);
+  const sprayDays = seed.sprayDays ?? (seed.category === "FRUIT" ? 12 : 10);
+  const feedingPlan =
+    seed.feedingPlan ??
+    (seed.category === "FRUIT"
+      ? "NPK с фокус K + Ca в плододаване."
+      : "Стартов фосфор, после балансиран NPK.");
+  const mowingZone = seed.mowingZone ?? (seed.category === "FRUIT" ? "в междуредията на овошките" : "около лехите");
+  const risk = seed.risk ?? (seed.category === "FRUIT" ? "струпясване и листни въшки" : "мана и листни въшки");
+
+  return [
+    {
+      stage: "Подготовка на площта",
+      period: `10-14 дни преди засаждане на ${seed.name}`,
+      goal: `Изравняване, почистване и стартова подготовка за ${seed.name}.`,
+      nutrition: `${feedingPlan} + органика.`,
+      frequency: "Еднократно преди старта.",
+      plantingScheme: seed.scheme,
+      taskType: "SEEDING",
+      offsetDays: -10,
+    },
+    {
+      stage: "Засаждане / сеитба",
+      period: `В прозореца ${seed.main}`,
+      goal: "Равномерно прихващане и добро начално развитие.",
+      nutrition: "Стартерен тор с повече фосфор.",
+      frequency: "В деня на засаждане.",
+      plantingScheme: seed.scheme,
+      taskType: "SEEDING",
+      offsetDays: 0,
+    },
+    {
+      stage: "Начален растеж",
+      period: "10-20 дни след засаждане",
+      goal: `Силен вегетативен старт и устойчивост за ${seed.name}.`,
+      nutrition: feedingPlan,
+      frequency: "На 7-10 дни при активен растеж.",
+      plantingScheme: seed.scheme,
+      taskType: "FEEDING",
+      offsetDays: 14,
+    },
+    {
+      stage: "Окопаване / междуредова обработка",
+      period: "2-5 седмици след засаждане",
+      goal: "Плевелоконтрол и запазване на почвената влага.",
+      nutrition: "При нужда леко азотно подхранване.",
+      frequency: "1-3 обработки според заплевеляване.",
+      plantingScheme: seed.scheme,
+      taskType: "HOEING",
+      offsetDays: 21,
+    },
+    {
+      stage: "Растителна защита",
+      period: "До края на вегетацията",
+      goal: `Контрол на рискове: ${risk}.`,
+      nutrition: "Листно подхранване с микроелементи при стрес.",
+      frequency: `На ${sprayDays}-${sprayDays + 3} дни според условията.`,
+      plantingScheme: seed.scheme,
+      taskType: "SPRAYING",
+      offsetDays: 30,
+    },
+    {
+      stage: "Косене и санитарна зона",
+      period: "След прихващане до края на сезона",
+      goal: `Поддържане на чиста зона ${mowingZone}.`,
+      nutrition: "Не се прилага.",
+      frequency: "На 2-3 седмици.",
+      plantingScheme: seed.scheme,
+      taskType: "MOWING",
+      offsetDays: 35,
+    },
+    {
+      stage: "Беритба / прибиране",
+      period: `В прозореца ${seed.harvest}`,
+      goal: "Качествен добив и правилно съхранение.",
+      nutrition: "Калиево подпомагане преди пикова беритба.",
+      frequency: "Поетапно според зрелост.",
+      plantingScheme: seed.scheme,
+      taskType: "HARVESTING",
+      offsetDays: Math.max(55, Math.min(cycleDays, 210)),
+    },
+  ];
 }
 
 function toGuide(seed: CropSeed): CropGuide {
+  const rows = buildRows(seed);
   return {
     key: normalizeCropName(seed.name).replace(/\s+/g, "-"),
     name: seed.name,
@@ -196,29 +210,38 @@ function toGuide(seed: CropSeed): CropGuide {
     plantingLate: seed.late,
     harvestWindow: seed.harvest,
     plantingScheme: seed.scheme,
-    steps: [
-      ...DEFAULT_STEPS,
-      {
-        title: "Косене около насаждението",
-        description: "Косене и поддръжка около редовете/овошките.",
-        offsetDays: 35,
-        taskType: "MOWING",
-      },
-    ],
-    calendarRows: buildRows(seed.scheme),
+    steps: rows.map((r) => ({
+      title: r.stage,
+      description: `${r.goal} ${r.frequency}`,
+      offsetDays: r.offsetDays,
+      taskType: r.taskType,
+    })),
+    calendarRows: rows,
   };
 }
 
 const extraGuides: CropGuide[] = EXTRA_CROPS.map((name) =>
   toGuide({
     name,
-    category: name.includes("грозде") || name.includes("Лозя") || name.includes("Орех") || name.includes("Бадем") || name.includes("Киви") ? "FRUIT" : "VEGETABLE",
-    early: "II-III",
-    main: "IV-V",
-    late: "VIII-IX",
-    harvest: "VI-X",
-    scheme: "60x30 см",
-    summary: "Стандартен агрономически шаблон; коригирай по регион и сорт.",
+    category:
+      name.includes("грозде") ||
+      name.includes("Лозя") ||
+      name.includes("Орех") ||
+      name.includes("Бадем") ||
+      name.includes("Киви")
+        ? "FRUIT"
+        : "VEGETABLE",
+    early: hashName(name) % 2 === 0 ? "II-III" : "III-IV",
+    main: hashName(name) % 3 === 0 ? "IV-VI" : "IV-V",
+    late: hashName(name) % 2 === 0 ? "VIII-IX" : "VII-IX",
+    harvest: hashName(name) % 2 === 0 ? "VI-X" : "VII-XI",
+    scheme: `${50 + (hashName(name) % 6) * 10}x${20 + (hashName(name) % 4) * 5} см`,
+    summary: `Индивидуален професионален профил за ${name}; коригирай детайлите по регион и сорт.`,
+    cycleDays: 70 + (hashName(name) % 7) * 15,
+    sprayDays: 9 + (hashName(name) % 5),
+    feedingPlan: hashName(name) % 2 === 0 ? "Баланс NPK с Mg и Zn." : "Фосфорно-калиев акцент + Ca.",
+    risk: hashName(name) % 2 === 0 ? "гъбни заболявания и листогризещи" : "листни въшки и акари",
+    mowingZone: hashName(name) % 2 === 0 ? "около блоковете" : "по периферията на парцела",
   }),
 );
 
@@ -230,6 +253,14 @@ function normalizeCropName(name: string) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
+}
+
+function hashName(name: string) {
+  let h = 0;
+  for (const ch of name) {
+    h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  }
+  return h;
 }
 
 export function findCropGuide(name: string): CropGuide | null {
